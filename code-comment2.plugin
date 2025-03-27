@@ -1,0 +1,9 @@
+[Plugin]
+Module=code-comment2
+IAge=3
+Name=Code comment 2
+Description=Comment or uncomment code.
+Authors=Florian Evaldsson <florian.evaldsson@telia.com>
+Copyright=Copyright @ 2025 Florian Evaldsson
+Version=48.1
+
