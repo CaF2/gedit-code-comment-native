@@ -28,6 +28,8 @@ freely, subject to the following restrictions:
 #include <gedit/gedit-app-activatable.h>
 #include <gedit/gedit-window-activatable.h>
 
+typedef int (*Comment_function)(GtkTextBuffer *buffer, GtkTextIter *start, GtkTextIter *end, const char *block_comment_start, 
+                             const char *block_comment_end, const char *line_comment_start);
 static void gedit_app_activatable_iface_init(GeditAppActivatableInterface *iface);
 static void gedit_window_activatable_iface_init(GeditWindowActivatableInterface *iface);
 
@@ -95,22 +97,35 @@ static int get_comment_definitions(GtkTextBuffer *buffer, const char **block_com
 		(*block_comment_end) = gtk_source_language_get_metadata(language, "block-comment-end");
 		(*line_comment_start) = gtk_source_language_get_metadata(language, "line-comment-start");
 
-		printf("LANG: %s [%s %s %s]\n", pango_language_to_string(lang), *block_comment_start, *block_comment_end, *line_comment_start);
+		//printf("LANG: %s [%s %s %s]\n", pango_language_to_string(lang), *block_comment_start, *block_comment_end, *line_comment_start);
 	}
 }
 
-static int remove_comment_if_exists(GtkTextBuffer *buffer, GtkTextIter *start, GtkTextIter *end, const char *text)
+static gboolean check_text_between_iters(GtkTextBuffer *buffer, GtkTextIter *start, GtkTextIter *end, 
+                                         const size_t text_len, const char *text)
 {
 	const gint line_len=get_line_length(buffer,end);
-	if(line_len>=strlen(text))
+	if(line_len>=text_len)
 	{
-		gboolean found_line_comment = gtk_text_iter_forward_search(start, text, GTK_TEXT_SEARCH_TEXT_ONLY, NULL, NULL, end);
-			
-		if(found_line_comment)
-		{
-			gtk_text_buffer_delete(buffer, start, end);
-		}
+		const gboolean found_line_comment = gtk_text_iter_forward_search(start, text, GTK_TEXT_SEARCH_TEXT_ONLY, NULL, NULL, end);
+		
+		return found_line_comment;
 	}
+	
+	return FALSE;
+}
+
+static int remove_comment_if_exists(GtkTextBuffer *buffer, GtkTextIter *start, GtkTextIter *end, const size_t text_len, const char *text)
+{
+	gboolean found_line_comment = check_text_between_iters(buffer,start,end,text_len,text);
+	
+	if(found_line_comment)
+	{
+		gtk_text_buffer_delete(buffer, start, end);
+		return 0;
+	}
+	
+	return 1;
 }
 
 static void add_actual_comment_on_line(GtkTextBuffer *buffer, GtkTextIter *itr, const char *block_comment_start, 
@@ -149,22 +164,43 @@ static void remove_actual_comment_on_line(GtkTextBuffer *buffer, GtkTextIter *it
 	gtk_text_iter_set_line_offset(&this_itr, 0);
 	gtk_text_iter_assign(&comment_end_iter, &this_itr);
 	
+	const size_t block_comment_start_len=strlen(block_comment_start);
+	//
+	gboolean is_multicomment=FALSE;
+	
 	if(line_comment_start)
 	{
-		gtk_text_iter_forward_chars(&comment_end_iter,strlen(line_comment_start));
+		GtkTextIter test_end_iter;
 		
-		remove_comment_if_exists(buffer, &this_itr, &comment_end_iter, line_comment_start);
+		gtk_text_iter_assign(&test_end_iter, &this_itr);
+		gtk_text_iter_forward_chars(&test_end_iter,block_comment_start_len);
+		
+		if(check_text_between_iters(buffer, &this_itr, &test_end_iter, block_comment_start_len, block_comment_start))
+		{
+			is_multicomment=TRUE;
+		}
+	}
+	
+	if(line_comment_start && !is_multicomment)
+	{
+		const size_t line_comment_start_len=strlen(line_comment_start);
+		
+		gtk_text_iter_forward_chars(&comment_end_iter,line_comment_start_len);
+		
+		remove_comment_if_exists(buffer, &this_itr, &comment_end_iter, line_comment_start_len, line_comment_start);
 	}
 	else
 	{
+		const size_t block_comment_end_len=strlen(block_comment_end);
+	
 		gtk_text_buffer_begin_user_action(buffer);
 		
-		gtk_text_iter_forward_chars(&comment_end_iter,strlen(block_comment_start));
-		remove_comment_if_exists(buffer, &this_itr, &comment_end_iter, block_comment_start);
+		gtk_text_iter_forward_chars(&comment_end_iter,block_comment_start_len);
+		remove_comment_if_exists(buffer, &this_itr, &comment_end_iter, block_comment_start_len, block_comment_start);
 		gtk_text_iter_go_to_line_end(&this_itr);
 		gtk_text_iter_assign(&comment_end_iter, &this_itr);
 		gtk_text_iter_backward_chars(&this_itr,strlen(block_comment_end));
-		remove_comment_if_exists(buffer, &this_itr, &comment_end_iter, block_comment_end);
+		remove_comment_if_exists(buffer, &this_itr, &comment_end_iter, block_comment_end_len, block_comment_end);
 		
 		gtk_text_buffer_end_user_action(buffer);
 	}
@@ -205,7 +241,7 @@ static int line_comment_code(GtkTextBuffer *buffer, GtkTextIter *start, GtkTextI
 	}
 }
 
-static void comment_code(GeditCommentPlugin *plugin)
+static void comment_code(GeditCommentPlugin *plugin, Comment_function com_funct)
 {
 	GeditCommentPluginPrivate *const priv = plugin->priv;
 	GeditDocument *doc;
@@ -244,7 +280,7 @@ static void comment_code(GeditCommentPlugin *plugin)
 		}
 		else*/
 		{
-			line_comment_code(buffer, &start, &end, block_comment_start,block_comment_end,line_comment_start);
+			com_funct(buffer, &start, &end, block_comment_start,block_comment_end,line_comment_start);
 		}
 	}
 	else
@@ -253,7 +289,7 @@ static void comment_code(GeditCommentPlugin *plugin)
 		GtkTextMark *mark = gtk_text_buffer_get_insert(buffer);
 		gtk_text_buffer_get_iter_at_mark(buffer, &iter, mark);
 
-		line_comment_code(buffer, &iter, NULL, block_comment_start,block_comment_end,line_comment_start);
+		com_funct(buffer, &iter, NULL, block_comment_start,block_comment_end,line_comment_start);
 	}
 }
 
@@ -292,56 +328,14 @@ static int line_uncomment_code(GtkTextBuffer *buffer, GtkTextIter *start, GtkTex
 	}
 }
 
-static void uncomment_code(GeditCommentPlugin *plugin)
-{
-	//printf("Uncomment code\n");
-	GeditCommentPluginPrivate *priv;
-	GeditDocument *doc;
-	GtkTextIter start, end;
-	
-	const char *block_comment_start = NULL;
-	const char *block_comment_end = NULL;
-	const char *line_comment_start = NULL;
-	
-	priv = plugin->priv;
-	
-	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(gedit_window_get_active_view(priv->window)));
-	
-	get_comment_definitions(buffer,&block_comment_start,&block_comment_end,&line_comment_start);
-
-	doc = gedit_window_get_active_document(priv->window);
-	g_return_if_fail(doc != NULL);
-
-	if (gtk_text_buffer_get_selection_bounds(buffer, &start, &end))
-	{
-		//gchar *text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
-		//if (g_str_has_prefix(text, comment_tag))
-		//{
-		//	gtk_text_buffer_delete(buffer, &start, &end);
-		//}
-		//else
-		{
-			line_uncomment_code(buffer, &start, &end, block_comment_start,block_comment_end,line_comment_start);
-		}
-	}
-	else
-	{
-		GtkTextIter iter;
-		GtkTextMark *mark = gtk_text_buffer_get_insert(buffer);
-		gtk_text_buffer_get_iter_at_mark(buffer, &iter, mark);
-	
-		line_uncomment_code(buffer, &iter, NULL, block_comment_start,block_comment_end,line_comment_start);
-	}
-}
-
 static void comment_cb(GAction *action, GVariant *parameter, GeditCommentPlugin *plugin)
 {
-	comment_code(plugin);
+	comment_code(plugin,line_comment_code);
 }
 
 static void uncomment_cb(GAction *action, GVariant *parameter, GeditCommentPlugin *plugin)
 {
-	uncomment_code(plugin);
+	comment_code(plugin,line_uncomment_code);
 }
 
 static void update_ui(GeditCommentPlugin *plugin)
