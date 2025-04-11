@@ -164,11 +164,11 @@ static void remove_actual_comment_on_line(GtkTextBuffer *buffer, GtkTextIter *it
 	gtk_text_iter_set_line_offset(&this_itr, 0);
 	gtk_text_iter_assign(&comment_end_iter, &this_itr);
 	
-	const size_t block_comment_start_len=strlen(block_comment_start);
+	const size_t block_comment_start_len=block_comment_start?strlen(block_comment_start):0;
 	//
 	gboolean is_multicomment=FALSE;
 	
-	if(line_comment_start)
+	if(line_comment_start && block_comment_start)
 	{
 		GtkTextIter test_end_iter;
 		
