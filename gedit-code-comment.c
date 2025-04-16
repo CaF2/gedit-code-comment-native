@@ -86,19 +86,14 @@ static int get_comment_definitions(GtkTextBuffer *buffer, const char **block_com
 {
 	GtkSourceBuffer *sbuffer = GTK_SOURCE_BUFFER(buffer);
 	GtkSourceLanguage *language = gtk_source_buffer_get_language(sbuffer);
-	if (buffer)
+	if (language)
 	{
-		GtkTextIter iter;
-		GtkTextMark *mark = gtk_text_buffer_get_insert(buffer);
-		gtk_text_buffer_get_iter_at_mark(buffer, &iter, mark);
-		PangoLanguage *lang = gtk_text_iter_get_language(&iter);
-
 		(*block_comment_start) = gtk_source_language_get_metadata(language, "block-comment-start");
 		(*block_comment_end) = gtk_source_language_get_metadata(language, "block-comment-end");
 		(*line_comment_start) = gtk_source_language_get_metadata(language, "line-comment-start");
-
-		//printf("LANG: %s [%s %s %s]\n", pango_language_to_string(lang), *block_comment_start, *block_comment_end, *line_comment_start);
+		return 0;
 	}
+	return -1;
 }
 
 static gboolean check_text_between_iters(GtkTextBuffer *buffer, GtkTextIter *start, GtkTextIter *end, 
@@ -129,9 +124,8 @@ static int remove_comment_if_exists(GtkTextBuffer *buffer, GtkTextIter *start, G
 }
 
 static void add_actual_comment_on_line(GtkTextBuffer *buffer, GtkTextIter *itr, const char *block_comment_start, 
-                             const char *block_comment_end, const char *line_comment_start)
+                                       const char *block_comment_end, const char *line_comment_start)
 {
-
 	GtkTextIter this_itr;
 	gtk_text_iter_assign(&this_itr, itr);
 	
@@ -156,7 +150,6 @@ static void add_actual_comment_on_line(GtkTextBuffer *buffer, GtkTextIter *itr, 
 static void remove_actual_comment_on_line(GtkTextBuffer *buffer, GtkTextIter *itr, const char *block_comment_start, 
                                           const char *block_comment_end, const char *line_comment_start)
 {
-
 	GtkTextIter this_itr;
 	GtkTextIter comment_end_iter;
 	
@@ -239,6 +232,8 @@ static int line_comment_code(GtkTextBuffer *buffer, GtkTextIter *start, GtkTextI
 	{
 		add_actual_comment_on_line(buffer,start,block_comment_start,block_comment_end,line_comment_start);
 	}
+	
+	return 0;
 }
 
 static void comment_code(GeditCommentPlugin *plugin, Comment_function com_funct)
@@ -326,6 +321,8 @@ static int line_uncomment_code(GtkTextBuffer *buffer, GtkTextIter *start, GtkTex
 	{
 		remove_actual_comment_on_line(buffer, start,block_comment_start,block_comment_end,line_comment_start);
 	}
+	
+	return 0;
 }
 
 static void comment_cb(GAction *action, GVariant *parameter, GeditCommentPlugin *plugin)
@@ -379,7 +376,7 @@ static void gedit_comment_plugin_app_deactivate(GeditAppActivatable *activatable
 
 static void gedit_comment_plugin_window_activate(GeditWindowActivatable *activatable)
 {
-	GeditCommentPlugin *plugin = GEDIT_COMMENT_PLUGIN(activatable);
+	//GeditCommentPlugin *plugin = GEDIT_COMMENT_PLUGIN(activatable);
 
 	GeditCommentPluginPrivate *priv;
 

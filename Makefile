@@ -30,7 +30,7 @@ OBJS = $(SRCS:.c=.c.o)
 
 PKG_CONF = gedit
 
-CFLAGS = $(if $(PKG_CONF),$(shell pkg-config --cflags $(PKG_CONF))) -g -fPIC
+CFLAGS = $(if $(PKG_CONF),$(shell pkg-config --cflags $(PKG_CONF))) -g -fPIC -Wall
 CFLAGS += -MMD -MP
 
 LDFLAGS = $(if $(PKG_CONF),$(shell pkg-config --libs $(PKG_CONF))) -shared
