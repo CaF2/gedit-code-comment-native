@@ -249,42 +249,45 @@ static void comment_code(GeditCommentPlugin *plugin, Comment_function com_funct)
 	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(gedit_window_get_active_view(priv->window)));
 	
 	get_comment_definitions(buffer,&block_comment_start,&block_comment_end,&line_comment_start);
-
-	doc = gedit_window_get_active_document(priv->window);
-	g_return_if_fail(doc != NULL);
-
-	if (gtk_text_buffer_get_selection_bounds(buffer, &start, &end))
+	
+	if(line_comment_start || (block_comment_start && block_comment_end))
 	{
-		/*gboolean found_other_block_comment =
-		    gtk_text_iter_forward_search(&start, block_comment_start, GTK_TEXT_SEARCH_TEXT_ONLY, NULL, NULL, &end);
+		doc = gedit_window_get_active_document(priv->window);
+		g_return_if_fail(doc != NULL);
 
-		if (!found_other_block_comment)
+		if (gtk_text_buffer_get_selection_bounds(buffer, &start, &end))
 		{
-			if (block_comment_start && block_comment_end)
+			/*gboolean found_other_block_comment =
+				gtk_text_iter_forward_search(&start, block_comment_start, GTK_TEXT_SEARCH_TEXT_ONLY, NULL, NULL, &end);
+
+			if (!found_other_block_comment)
 			{
-				gtk_text_buffer_begin_user_action(buffer);
-
-				gtk_text_buffer_insert(buffer, &start, block_comment_start, -1);
-				if (gtk_text_buffer_get_selection_bounds(buffer, &start, &end))
+				if (block_comment_start && block_comment_end)
 				{
-					gtk_text_buffer_insert(buffer, &end, block_comment_end, -1);
-				}
+					gtk_text_buffer_begin_user_action(buffer);
 
-				gtk_text_buffer_end_user_action(buffer);
+					gtk_text_buffer_insert(buffer, &start, block_comment_start, -1);
+					if (gtk_text_buffer_get_selection_bounds(buffer, &start, &end))
+					{
+						gtk_text_buffer_insert(buffer, &end, block_comment_end, -1);
+					}
+
+					gtk_text_buffer_end_user_action(buffer);
+				}
+			}
+			else*/
+			{
+				com_funct(buffer, &start, &end, block_comment_start,block_comment_end,line_comment_start);
 			}
 		}
-		else*/
+		else
 		{
-			com_funct(buffer, &start, &end, block_comment_start,block_comment_end,line_comment_start);
-		}
-	}
-	else
-	{
-		GtkTextIter iter;
-		GtkTextMark *mark = gtk_text_buffer_get_insert(buffer);
-		gtk_text_buffer_get_iter_at_mark(buffer, &iter, mark);
+			GtkTextIter iter;
+			GtkTextMark *mark = gtk_text_buffer_get_insert(buffer);
+			gtk_text_buffer_get_iter_at_mark(buffer, &iter, mark);
 
-		com_funct(buffer, &iter, NULL, block_comment_start,block_comment_end,line_comment_start);
+			com_funct(buffer, &iter, NULL, block_comment_start,block_comment_end,line_comment_start);
+		}
 	}
 }
 
