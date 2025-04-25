@@ -224,7 +224,7 @@ static int line_comment_code(GtkTextBuffer *buffer, GtkTextIter *start, GtkTextI
 			gtk_text_iter_forward_lines(&start_iter, i + 1);
 
 			i++;
-		}while(gtk_text_iter_get_offset(&end_iter) >= gtk_text_iter_get_offset(&start_iter));
+		}while(gtk_text_iter_get_offset(&end_iter) >= gtk_text_iter_get_offset(&start_iter) && !gtk_text_iter_is_end(&start_iter));
 
 		gtk_text_buffer_end_user_action(buffer);
 	}
