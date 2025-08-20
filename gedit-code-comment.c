@@ -81,19 +81,74 @@ static gint get_line_length(GtkTextBuffer *buffer, GtkTextIter *iter)
 	return gtk_text_iter_get_offset(&line_end) - gtk_text_iter_get_offset(&line_start);
 }
 
-static int get_comment_definitions(GtkTextBuffer *buffer, const char **block_comment_start, 
-                                   const char **block_comment_end, const char **line_comment_start)
+static int get_comment_definitions(GtkTextBuffer *buffer,
+                                   const char **block_comment_start, 
+                                   const char **block_comment_end, 
+                                   const char **line_comment_start)
 {
+
 	GtkSourceBuffer *sbuffer = GTK_SOURCE_BUFFER(buffer);
 	GtkSourceLanguage *language = gtk_source_buffer_get_language(sbuffer);
-	if (language)
+
+	if (!language)
 	{
-		(*block_comment_start) = gtk_source_language_get_metadata(language, "block-comment-start");
-		(*block_comment_end) = gtk_source_language_get_metadata(language, "block-comment-end");
-		(*line_comment_start) = gtk_source_language_get_metadata(language, "line-comment-start");
-		return 0;
+		return -1;
 	}
-	return -1;
+
+	const gchar *lang_id = gtk_source_language_get_id(language);
+
+	/* Handle embedded languages in HTML */
+	if (g_strcmp0(lang_id, "html") == 0)
+	{
+		GtkTextIter iter;
+		gtk_text_buffer_get_iter_at_mark(buffer, &iter, gtk_text_buffer_get_insert(buffer));
+
+		GtkSourceLanguageManager *manager = gtk_source_language_manager_get_default();
+		gboolean found_tag = FALSE;
+
+		do
+		{
+			// Start of the current line
+			GtkTextIter line_start = iter;
+			gtk_text_iter_set_line_offset(&line_start, 0);
+
+			// End of the current line
+			GtkTextIter line_end = iter;
+			gtk_text_iter_forward_to_line_end(&line_end);
+
+			g_autofree gchar *line_text = gtk_text_buffer_get_text(buffer, &line_start, &line_end, FALSE);
+//			fprintf(stdout,"%s:%d LINE TEXT: [%s]\n", __FILE__, __LINE__, line_text);
+
+			if (g_strrstr(line_text, "<script") != NULL)
+			{
+				language = gtk_source_language_manager_get_language(manager, "js");
+				found_tag = TRUE;
+				break;
+			}
+			else if (g_strrstr(line_text, "<style") != NULL)
+			{
+				language = gtk_source_language_manager_get_language(manager, "css");
+				found_tag = TRUE;
+				break;
+			}
+			else if (g_strrstr(line_text, "</style") != NULL || g_strrstr(line_text, "</script") != NULL)
+			{
+				found_tag = FALSE;
+				break;
+			}
+
+			// Move to the start of the previous line
+		} while (gtk_text_iter_backward_line(&iter));
+
+		if (!found_tag)
+			language = gtk_source_buffer_get_language(GTK_SOURCE_BUFFER(buffer));
+	}
+
+	(*block_comment_start) = gtk_source_language_get_metadata(language, "block-comment-start");
+	(*block_comment_end)   = gtk_source_language_get_metadata(language, "block-comment-end");
+	(*line_comment_start)  = gtk_source_language_get_metadata(language, "line-comment-start");
+
+	return 0;
 }
 
 static gboolean check_text_between_iters(GtkTextBuffer *buffer, GtkTextIter *start, GtkTextIter *end, 

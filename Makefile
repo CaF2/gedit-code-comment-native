@@ -40,6 +40,8 @@ LDFLAGS = $(if $(PKG_CONF),$(shell pkg-config --libs $(PKG_CONF))) -shared
 
 RUN_COMMAND = gedit -s test.c
 
+RUN_COMMAND_WEB = gedit -s test.html
+
 ###########
 
 all: $(NAME).so
@@ -52,6 +54,9 @@ $(NAME).so: $(OBJS)
 	
 run: all
 	$(RUN_COMMAND)
+	
+runweb: all
+	$(RUN_COMMAND_WEB)
 	
 gdb: all
 	gdb --args $(RUN_COMMAND)
