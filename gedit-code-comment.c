@@ -114,24 +114,33 @@ static int get_comment_definitions(GtkTextBuffer *buffer,
 
 			// End of the current line
 			GtkTextIter line_end = iter;
-			gtk_text_iter_forward_to_line_end(&line_end);
+			
+			if(!gtk_text_iter_ends_line(&iter))
+			{
+				gtk_text_iter_forward_to_line_end(&line_end);
+			}
 
 			g_autofree gchar *line_text = gtk_text_buffer_get_text(buffer, &line_start, &line_end, FALSE);
 //			fprintf(stdout,"%s:%d LINE TEXT: [%s]\n", __FILE__, __LINE__, line_text);
-
-			if (g_strrstr(line_text, "<script") != NULL)
+//			fprintf(stdout,"%s:%d GOT LINE: [%s]\n",__FILE__,__LINE__,line_text);
+			const char *const restrict script_pos=g_strrstr(line_text, "<script");
+			const char *const restrict end_script_pos=g_strrstr(line_text, "</script");
+			const char *const restrict css_pos=g_strrstr(line_text, "<style");
+			const char *const restrict end_css_pos=g_strrstr(line_text, "</style");
+			
+			if ((script_pos != NULL && end_script_pos==NULL) || (script_pos && end_script_pos && script_pos>end_script_pos))
 			{
 				language = gtk_source_language_manager_get_language(manager, "js");
 				found_tag = TRUE;
 				break;
 			}
-			else if (g_strrstr(line_text, "<style") != NULL)
+			else if ((css_pos != NULL && end_css_pos==NULL) || (css_pos && end_css_pos && css_pos>end_css_pos))
 			{
 				language = gtk_source_language_manager_get_language(manager, "css");
 				found_tag = TRUE;
 				break;
 			}
-			else if (g_strrstr(line_text, "</style") != NULL || g_strrstr(line_text, "</script") != NULL)
+			else if ((end_css_pos != NULL || end_script_pos != NULL))
 			{
 				found_tag = FALSE;
 				break;
